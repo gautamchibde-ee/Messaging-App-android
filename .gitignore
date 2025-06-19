@@ -1,0 +1,91 @@
+# Built application files
+*.apk
+*.ap_
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+build/
+.gradle/
+.idea/
+.cxx/
+*.iml
+*.iws
+*.ipr
+local.properties
+.DS_Store
+captures/
+.externalNativeBuild/
+.build/
+.project
+.settings/
+.classpath
+gradle-wrapper/
+gradle-wrapper.jar
+/local.properties
+/personal_info.txt # Example for sensitive info, adjust as needed
+/data/ # Example for large data files, adjust as needed
+
+# Android Studio and IntelliJ IDEA files
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/libraries/
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/codeStyles/
+.idea/dictionaries/
+.idea/copyright/
+.idea/scopes/
+.idea/vcs.xml
+.idea/compiler.xml
+
+# Keystore files
+*.keystore
+
+# External native build files
+**/*.o
+**/*.so
+**/*.obj
+**/*.lib
+**/*.dll
+**/*.exe
+
+# Crashlytics/Fabric files
+fabric/
+
+# macOS files
+.DS_Store
+
+# Windows files
+Thumbs.db
+
+# Other
+*.log
+!gradle-wrapper.jar # Keep this line if you use Gradle Wrapper and want to commit it
+
+# For example, if you have a debug.keystore in your project root
+# debug.keystore
+
+# Local test results
+/app/build/test-results/
+
+# User-specific settings (Android Studio)
+.idea/misc.xml
+
+# Gradle caches
+.gradle/
+.gradle-cache/
+
+# Custom build output directories (if you have them)
+/custom_output_dir/
+
+# If you are using NDK, you might want to ignore these too:
+# obj/
+# libs/

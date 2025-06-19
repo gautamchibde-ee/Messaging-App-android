@@ -35,9 +35,10 @@ jobs:
           name: unit-test-results
           path: app/build/reports/tests/testDebugUnitTest/
 
-  build_app:
-    needs: unit_tests
+  build_apks:
     runs-on: ubuntu-latest
+    outputs:
+      build_artifact_path: ${{ steps.upload.outputs.artifact-path }}
     steps:
       - uses: actions/checkout@v3
 
@@ -51,11 +52,20 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Android App Bundle
-        run: ./gradlew bundleDebug
+      - name: Build app and test APKs
+        run: ./gradlew assembleDebug assembleDebugAndroidTest
+
+      - name: Upload APKs
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-apks
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/androidTest/debug/*.apk
 
   ui_tests:
-    needs: build_app
+    needs: [unit_tests, build_apks]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -70,15 +80,23 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run UI Tests on Emulator
-        uses: reactivecircus/android-emulator-runner@v2
+      - name: Start Emulator
+        uses: vgaidarji/android-github-actions-emulator@v1.0.0
         with:
-          api-level: 30
-          target: google_apis
+          api-level: 29
+          target: default
           arch: x86
-          disable-animations: true
-          emulator-options: "-no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot-save -no-accel"
-          script: ./gradlew connectedDebugAndroidTest
+          profile: Nexus 5
+          emulator-options: "-no-window -no-audio -no-boot-anim -gpu swiftshader_indirect"
+
+      - name: Wait for Emulator to Boot
+        run: |
+          adb wait-for-device
+          until adb shell getprop sys.boot_completed | grep -m 1 '1'; do sleep 1; done
+          adb shell input keyevent 82
+
+      - name: Run Instrumentation Tests
+        run: ./gradlew connectedDebugAndroidTest
 
       - name: Upload UI Test Results
         uses: actions/upload-artifact@v4
@@ -87,14 +105,7 @@ jobs:
           name: ui-test-results
           path: app/build/outputs/androidTest-results/connected/
 
-      - name: Upload Screenshots (if any)
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: screenshots
-          path: app/build/outputs/connected_android_test_additional_output/debugAndroidTest/connected/**/*
-
-      - name: Dump Logcat (for debugging if needed)
+      - name: Dump Logcat
         if: always()
         run: adb logcat -d > logcat.txt
 

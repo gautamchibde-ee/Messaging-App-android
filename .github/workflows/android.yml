@@ -81,7 +81,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Start Emulator
-        uses: vgaidarji/android-github-actions-emulator@v1.0.0
+        uses: vgaidarji/android-github-actions-emulator@master
         with:
           api-level: 29
           target: default

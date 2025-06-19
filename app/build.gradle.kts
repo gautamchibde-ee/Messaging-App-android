@@ -51,6 +51,10 @@ android {
             force("androidx.test.espresso:espresso-core:${libs.versions.espressoCore.get()}")
         }
     }
+
+    testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
+    }
 }
 
 ktlint {
@@ -93,4 +97,5 @@ dependencies {
 
     // Hilt Testing for Android Instrumentation Tests
     androidTestImplementation(libs.hilt.android.testing)
+    androidTestUtil("androidx.test:orchestrator:1.4.2")
 }

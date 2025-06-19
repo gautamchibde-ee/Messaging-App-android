@@ -75,9 +75,9 @@ jobs:
         with:
           api-level: 30
           target: google_apis
-          arch: x86_64
+          arch: x86
           disable-animations: true
-          emulator-options: "-no-window -no-audio -no-boot-anim -gpu swiftshader_indirect"
+          emulator-options: "-no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot-save -no-accel"
           script: ./gradlew connectedDebugAndroidTest
 
       - name: Upload UI Test Results
@@ -93,3 +93,14 @@ jobs:
         with:
           name: screenshots
           path: app/build/outputs/connected_android_test_additional_output/debugAndroidTest/connected/**/*
+
+      - name: Dump Logcat (for debugging if needed)
+        if: always()
+        run: adb logcat -d > logcat.txt
+
+      - name: Upload Logcat
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator-logcat
+          path: logcat.txt

@@ -1,75 +1,73 @@
-# .circleci/config.yml
-# This file defines the CircleCI workflow for your Android project.
+version: 2.1
 
-version: 2.1 # Specifies the CircleCI config version
-
-# Orbs provide reusable packages of CircleCI configuration.
-# The 'android' orb simplifies Android project setup and emulator management.
-orbs:
-  android: circleci/android@4.1.2 # Updated to a more recent stable version of the Android Orb
-
-# Executors define the environment in which your jobs run.
-# We define an Android-specific executor using a Docker image.
 executors:
   android-executor:
-    # Use a pre-built CircleCI Docker image that includes JDK 17 and Android SDK components.
-    # This image provides a robust base for Android development.
     docker:
-      - image: cimg/android:2024.01
-    # 'resource_class' allocates CPU and RAM. 'large' is recommended for emulator-based tests.
-    resource_class: large
+      - image: cimg/openjdk:17.0  # includes JDK 17
+    working_directory: ~/project
 
-# Jobs define a collection of steps that run in an executor.
-# This job focuses solely on running your connected Android UI tests.
-jobs:
-  run_ui_tests:
-    executor: android-executor # Link to the Android executor defined above
+commands:
+  checkout_and_prepare:
     steps:
-      # Step 1: Checkout your repository code into the CircleCI workspace.
       - checkout
-
-      # Step 2: Grant execute permissions to the Gradle wrapper script.
-      # This is crucial for running Gradle commands.
       - run:
           name: Grant execute permission for gradlew
           command: chmod +x ./gradlew
 
-      # Step 3: Download Android project dependencies.
-      # Running 'androidDependencies' helps pre-cache and speed up subsequent Gradle commands.
-      # '|| true' ensures the step doesn't fail the build if there are minor issues, allowing caching.
+jobs:
+  unit_tests:
+    executor: android-executor
+    steps:
+      - checkout_and_prepare
       - run:
-          name: Download Android project dependencies
-          command: ./gradlew androidDependencies || true
+          name: Run Unit Tests
+          command: ./gradlew testDebugUnitTest
+      - store_artifacts:
+          path: app/build/reports/tests/testDebugUnitTest
+          destination: unit-test-results
 
-      # Step 4: Start an Android emulator using the 'android' orb.
-      # The orb handles:
-      # - Installing the specified API level system image (if not present).
-      # - Creating the AVD.
-      # - Starting the emulator.
-      # - Waiting for the emulator to fully boot.
-      # - Making the emulator available to ADB.
-      - android/start-emulator:
-          # Specify the API level for the emulator, matching your project's targetSdk.
-          api-level: 33
-          # You can add other parameters here if needed, e.g., 'avd-name', 'emulator-options'.
-          # The default emulator options provided by the orb are usually sufficient for CI.
-
-      # Step 5: Run your connected (instrumentation) Android UI tests on the emulator.
-      # This command will install your app and test APKs onto the running emulator.
+  build_app:
+    executor: android-executor
+    steps:
+      - checkout_and_prepare
       - run:
-          name: Run Connected Android UI Tests
-          command: ./gradlew connectedDebugAndroidTest
+          name: Build Android App Bundle
+          command: ./gradlew bundleDebug
 
-# Workflows define the execution order of jobs.
-# This workflow is named 'android_test_workflow' and contains one job.
+  ui_tests:
+    docker:
+      - image: cimg/openjdk:17.0
+    steps:
+      - checkout_and_prepare
+      - run:
+          name: Install Android SDK dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y android-sdk
+            yes | sdkmanager --licenses
+            sdkmanager "platform-tools" "platforms;android-30" "system-images;android-30;google_apis;x86_64" "emulator"
+      - run:
+          name: Run UI Tests on Emulator
+          command: |
+            echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --force
+            emulator -avd test -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
+            adb wait-for-device
+            ./gradlew connectedDebugAndroidTest
+      - store_artifacts:
+          path: app/build/outputs/androidTest-results/connected
+          destination: ui-test-results
+      - store_artifacts:
+          path: app/build/outputs/connected_android_test_additional_output/debugAndroidTest/connected
+          destination: screenshots
+
 workflows:
-  android_test_workflow:
+  version: 2
+  android_ci:
     jobs:
-      - run_ui_tests:
-          # Filters define when this job should run.
-          # It will only run on pushes and pull requests to 'main' and 'develop' branches.
-          filters:
-            branches:
-              only:
-                - main
-                - develop
+      - unit_tests
+      - build_app:
+          requires:
+            - unit_tests
+      - ui_tests:
+          requires:
+            - build_app

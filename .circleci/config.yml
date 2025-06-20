@@ -1,73 +1,65 @@
 version: 2.1
 
-executors:
-  android-executor:
+jobs:
+  android-tests:
     docker:
-      - image: cimg/openjdk:17.0  # includes JDK 17
+      - image: cimg/android:2024.06.1
     working_directory: ~/project
 
-commands:
-  checkout_and_prepare:
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+      ANDROID_HOME: /opt/android/sdk
+
     steps:
       - checkout
+
       - run:
-          name: Grant execute permission for gradlew
+          name: Grant permission to gradlew
           command: chmod +x ./gradlew
 
-jobs:
-  unit_tests:
-    executor: android-executor
-    steps:
-      - checkout_and_prepare
       - run:
           name: Run Unit Tests
           command: ./gradlew testDebugUnitTest
+
+      - run:
+          name: Accept Licenses
+          command: yes | sdkmanager --licenses
+
+      - run:
+          name: Install Emulator and System Image
+          command: |
+            sdkmanager "platform-tools" "platforms;android-30" "system-images;android-30;google_apis;x86_64" "emulator"
+
+      - run:
+          name: Create AVD
+          command: echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --force
+
+      - run:
+          name: Start Emulator
+          command: |
+            emulator -avd test -no-audio -no-window -no-boot-anim -gpu swiftshader_indirect &
+            adb wait-for-device
+            adb shell settings put global window_animation_scale 0 &
+            adb shell settings put global transition_animation_scale 0 &
+            adb shell settings put global animator_duration_scale 0
+
+      - run:
+          name: Run UI Tests
+          command: ./gradlew connectedDebugAndroidTest
+
       - store_artifacts:
           path: app/build/reports/tests/testDebugUnitTest
           destination: unit-test-results
 
-  build_app:
-    executor: android-executor
-    steps:
-      - checkout_and_prepare
-      - run:
-          name: Build Android App Bundle
-          command: ./gradlew bundleDebug
-
-  ui_tests:
-    docker:
-      - image: cimg/openjdk:17.0
-    steps:
-      - checkout_and_prepare
-      - run:
-          name: Install Android SDK dependencies
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y android-sdk
-            yes | sdkmanager --licenses
-            sdkmanager "platform-tools" "platforms;android-30" "system-images;android-30;google_apis;x86_64" "emulator"
-      - run:
-          name: Run UI Tests on Emulator
-          command: |
-            echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --force
-            emulator -avd test -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
-            adb wait-for-device
-            ./gradlew connectedDebugAndroidTest
       - store_artifacts:
           path: app/build/outputs/androidTest-results/connected
           destination: ui-test-results
+
       - store_artifacts:
           path: app/build/outputs/connected_android_test_additional_output/debugAndroidTest/connected
           destination: screenshots
 
 workflows:
-  version: 2
   android_ci:
     jobs:
-      - unit_tests
-      - build_app:
-          requires:
-            - unit_tests
-      - ui_tests:
-          requires:
-            - build_app
+      - android-tests

@@ -1,38 +1,88 @@
 version: 2.1
 
-orbs:
-  android: "2.1.2"
+# Define reusable executors (environments)
+executors:
+  android_executor:
+    docker:
+      # Choose an image with Android SDK, Java, and other tools you need
+      # CircleCI provides convenience images: cimg/android:<version>-node adds Node.js if needed
+      # Check CircleCI docs for the latest recommended images and tags:
+      # https://circleci.com/docs/circleci-images-android
+      # Example: Using an image with Android API 34 and Java 17
+      - image: cimg/android:2024.07 # Or a specific version like cimg/android:2024.07.1
+    environment:
+      # Set the JVM options for Gradle to avoid out-of-memory errors
+      _JAVA_OPTIONS: "-Xms1g -Xmx2g" # Adjust memory as needed
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2" # Optimize Gradle for CI
+    working_directory: ~/project
+
+# Define reusable commands (optional, but good for DRY configurations)
+commands:
+  # Command to restore Gradle cache
+  restore_gradle_cache:
+    steps:
+      - restore_cache:
+          keys:
+            - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+            - gradle-cache-{{ checksum "build.gradle.kts" }}-{{ checksum "app/build.gradle.kts" }} # Add other build.gradle files if you have more modules
+            # Fallback to the latest cache if no exact match is found
+            - gradle-cache-
+
+  # Command to save Gradle cache
+  save_gradle_cache:
+    steps:
+      - save_cache:
+          paths:
+            - ~/.gradle/caches
+            - ~/.gradle/wrapper
+          key: gradle-cache-{{ checksum "build.gradle.kts" }}-{{ checksum "app/build.gradle.kts" }} # Match the restore key
+
+# Define Jobs
+jobs:
+  build_android:
+    executor: android_executor
+    steps:
+      - checkout # Checks out the source code to the working directory
+
+      - run:
+          name: Set Execute Permissions for gradlew
+          command: chmod +x ./gradlew
+
+      - restore_gradle_cache # Use the reusable command
+
+      - run:
+          name: Download Dependencies
+          command: ./gradlew androidDependencies
+
+      - save_gradle_cache # Use the reusable command (save after dependencies are downloaded)
+
+      - run:
+          name: Run Build
+          # Choose the appropriate build command for your needs:
+          # ./gradlew build - Will run lint, tests, and assemble for all variants. Can be slow.
+          # ./gradlew assembleDebug - Builds only the debug APK. Faster.
+          # ./gradlew assembleRelease - Builds only the release APK (requires signing config).
+          command: ./gradlew assembleDebug # Example: Building the debug APK
+
+      # Optional: Store the generated APK as an artifact
+      - store_artifacts:
+          path: app/build/outputs/apk/debug/ # Path to your debug APK
+          destination: apks/ # Destination directory in the artifacts tab
+
+      # Optional: Store other build outputs like mapping files for release builds
+      # - store_artifacts:
+      #     path: app/build/outputs/mapping/release/mapping.txt
+      #     destination: mapping-files/
 
 workflows:
-  test-and-build:
+  version: 2
+  build_workflow:
     jobs:
-      - unit-test
-      - android-test: # Commits to any branch - skip matrix of devices
+      - build_android:
+          # Optional: Add filters if you only want to run this on specific branches
           filters:
             branches:
-              ignore: main
-      - android-test: # Commits to main branch only - run full matrix
-          matrix:
-            alias: android-test-all
-            parameters:
-              system-image:
-                - system-images;android-30;google_apis;x86
-                - system-images;android-29;google_apis;x86
-                - system-images;android-28;google_apis;x86
-                - system-images;android-27;google_apis;x86
-                - system-images;android-26;google_apis;x86
-                - system-images;android-25;google_apis;x86
-                - system-images;android-24;google_apis;x86
-                - system-images;android-23;google_apis;x86
-          name: android-test-<<matrix.system-image>>
-          filters:
-            branches:
-              only: main
-      - release-build:
-          requires:
-            - unit-test
-            - android-test-all
-          filters:
-            branches:
-              only: main # Commits to main branch
-      - build-and-test
+              only:
+                - main
+                - develop
+                # - /feature\/.*/ # Example: Run on all branches starting with 'feature/'

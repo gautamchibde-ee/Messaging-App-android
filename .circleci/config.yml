@@ -1,45 +1,75 @@
-# This config was automatically generated from your source code
-# Stacks detected: cicd:github-actions:.github/workflows,deps:java:.,tool:gradle:
-version: 2.1
+# .circleci/config.yml
+# This file defines the CircleCI workflow for your Android project.
+
+version: 2.1 # Specifies the CircleCI config version
+
+# Orbs provide reusable packages of CircleCI configuration.
+# The 'android' orb simplifies Android project setup and emulator management.
+orbs:
+  android: circleci/android@2.4.1 # Using the latest stable version of the Android Orb
+
+# Executors define the environment in which your jobs run.
+# We define an Android-specific executor using a Docker image.
+executors:
+  android-executor:
+    # Use a pre-built CircleCI Docker image that includes JDK 17 and Android SDK components.
+    # This image provides a robust base for Android development.
+    docker:
+      - image: cimg/android:2024.01
+    # 'resource_class' allocates CPU and RAM. 'large' is recommended for emulator-based tests.
+    resource_class: large
+
+# Jobs define a collection of steps that run in an executor.
+# This job focuses solely on running your connected Android UI tests.
 jobs:
-  test-java:
-    docker:
-      - image: cimg/openjdk:17.0
+  run_ui_tests:
+    executor: android-executor # Link to the Android executor defined above
     steps:
+      # Step 1: Checkout your repository code into the CircleCI workspace.
       - checkout
+
+      # Step 2: Grant execute permissions to the Gradle wrapper script.
+      # This is crucial for running Gradle commands.
       - run:
-          name: Calculate cache key
-          command: |-
-            find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
-                    sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
-      - restore_cache:
-          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
+          name: Grant execute permission for gradlew
+          command: chmod +x ./gradlew
+
+      # Step 3: Download Android project dependencies.
+      # Running 'androidDependencies' helps pre-cache and speed up subsequent Gradle commands.
+      # '|| true' ensures the step doesn't fail the build if there are minor issues, allowing caching.
       - run:
-          command: ./gradlew check
-      - store_test_results:
-          path: build/test-results
-      - save_cache:
-          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
-          paths:
-            - ~/.gradle/caches
-      - store_artifacts:
-          path: build/reports
-  deploy:
-    # This is an example deploy job, not actually used by the workflow
-    docker:
-      - image: cimg/base:stable
-    steps:
-      # Replace this with steps to deploy to users
+          name: Download Android project dependencies
+          command: ./gradlew androidDependencies || true
+
+      # Step 4: Start an Android emulator using the 'android' orb.
+      # The orb handles:
+      # - Installing the specified API level system image (if not present).
+      # - Creating the AVD.
+      # - Starting the emulator.
+      # - Waiting for the emulator to fully boot.
+      # - Making the emulator available to ADB.
+      - android/start-emulator:
+          # Specify the API level for the emulator, matching your project's targetSdk.
+          api-level: 33
+          # You can add other parameters here if needed, e.g., 'avd-name', 'emulator-options'.
+          # The default emulator options provided by the orb are usually sufficient for CI.
+
+      # Step 5: Run your connected (instrumentation) Android UI tests on the emulator.
+      # This command will install your app and test APKs onto the running emulator.
       - run:
-          name: deploy
-          command: '#e.g. ./deploy.sh'
-      - run:
-          name: found github actions config
-          command: ':'
+          name: Run Connected Android UI Tests
+          command: ./gradlew connectedDebugAndroidTest
+
+# Workflows define the execution order of jobs.
+# This workflow is named 'android_test_workflow' and contains one job.
 workflows:
-  build-and-test:
+  android_test_workflow:
     jobs:
-      - test-java
-    # - deploy:
-    #     requires:
-    #       - test-java
+      - run_ui_tests:
+          # Filters define when this job should run.
+          # It will only run on pushes and pull requests to 'main' and 'develop' branches.
+          filters:
+            branches:
+              only:
+                - main
+                - develop

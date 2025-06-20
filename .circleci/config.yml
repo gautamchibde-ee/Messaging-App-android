@@ -8,7 +8,7 @@ jobs:
   lint:
     executor:
       name: android/android-docker
-      resource-class: xlarge
+      resource-class: large
       tag: 2023.11.1
     steps:
       - checkout
@@ -19,7 +19,7 @@ jobs:
   unit_test:
     executor:
       name: android/android-docker
-      resource-class: xlarge
+      resource-class: large
       tag: 2023.11.1
     steps:
       - checkout
@@ -32,7 +32,7 @@ jobs:
   integration_test:
     executor:
       name: android/android-machine
-      resource-class: xlarge
+      resource-class: large
       tag: 2023.11.1
     steps:
       - checkout
@@ -43,7 +43,7 @@ jobs:
   beta:
     executor:
       name: android/android-docker
-      resource-class: xlarge
+      resource-class: large
       tag: 2023.11.1
     steps:
       - checkout

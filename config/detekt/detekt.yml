@@ -1,0 +1,55 @@
+naming:
+  FunctionNaming:
+    active: true
+    functionPattern: '^[a-z][A-Za-z0-9]*$'
+    ignoreAnnotated: ['Composable']
+    excludes: ['**/test/**','**/androidTest/**']
+
+  VariableNaming:
+    active: true
+
+  ClassNaming:
+    active: true
+
+  ObjectPropertyNaming:
+    active: true
+
+  TopLevelPropertyNaming:
+    active: true
+
+style:
+  MagicNumber:
+    active: false
+
+  MaxLineLength:
+    active: true
+    maxLineLength: 200
+  UnusedPrivateMember:
+    active: true
+    ignoreAnnotated: ['Preview']
+  ForbiddenComment:
+    active: true
+  WildcardImport:
+    active: false
+  DestructuringDeclarationWithTooManyEntries:
+    active: false
+  ReturnCount:
+    active: false
+  UnusedImports:
+    active: true
+
+complexity:
+  LongMethod:
+    threshold: 200
+  LongParameterList:
+    active: true
+    functionThreshold: 16
+    constructorThreshold: 11
+  TooManyFunctions:
+    active: true
+    ignorePrivate: true
+    ignoreOverridden: true
+
+config:
+  validation: true
+  warningsAsErrors: true

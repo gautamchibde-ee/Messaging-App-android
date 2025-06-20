@@ -25,7 +25,7 @@ class ChatScreenTest {
     @Test
     fun chatScreen_DisplaysPlaceholder() {
         composeTestRule
-            .onNodeWithText("Fill the code for chat app")
+            .onNodeWithText("Chat App")
             .assertExists()
     }
 

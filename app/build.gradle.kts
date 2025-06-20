@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.hilt)
     kotlin("kapt")
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
 }
 
 android {
@@ -55,6 +56,13 @@ android {
     testOptions {
         execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
+
+    detekt {
+        toolVersion = "1.23.7"
+        config.setFrom(file("../config/detekt/detekt.yml"))
+        buildUponDefaultConfig = true
+        autoCorrect = true
+    }
 }
 
 ktlint {
@@ -74,6 +82,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.viewmodel)
     implementation(libs.androidx.runtime.compose)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
 
     // Hilt dependencies
     implementation(libs.hilt.android)

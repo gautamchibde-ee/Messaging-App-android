@@ -6,7 +6,7 @@ version: 2.1 # Specifies the CircleCI config version
 # Orbs provide reusable packages of CircleCI configuration.
 # The 'android' orb simplifies Android project setup and emulator management.
 orbs:
-  android: circleci/android@2.4.1 # Using the latest stable version of the Android Orb
+  android: circleci/android@4.1.2 # Updated to a more recent stable version of the Android Orb
 
 # Executors define the environment in which your jobs run.
 # We define an Android-specific executor using a Docker image.

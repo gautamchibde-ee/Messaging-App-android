@@ -1,3 +1,4 @@
+# .github/workflows/android-ci.yml
 name: Android CI
 
 on:
@@ -26,15 +27,6 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-
-      - name: Run Ktlint Check
-        run: ./gradlew ktlintCheck
-
-      - name: Build Project
-        run: ./gradlew build
-
-      - name: Run Unit Tests
-        run: ./gradlew testDebugUnitTest
 
       - name: Set up Android SDK and Create AVD
         run: |

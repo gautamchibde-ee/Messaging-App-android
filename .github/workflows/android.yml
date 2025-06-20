@@ -29,31 +29,27 @@ jobs:
         run: chmod +x gradlew
 
       - name: Set up Android SDK and Create AVD
+        env:
+          # Define a specific path for AVDs within the GitHub Actions workspace
+          ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
         run: |
-          # Create .android directory if it doesn't exist, where AVD configurations are stored
-          mkdir -p ~/.android/avd
+          mkdir -p ${ANDROID_AVD_HOME}
 
-          # Install necessary Android SDK components and licenses
-          # Including platform-tools for adb
           echo "y" | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "system-images;android-33;default;x86_64" "platforms;android-33" "build-tools;33.0.0" "platform-tools"
           echo "y" | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
 
-          # Create a new Android Virtual Device (AVD)
-          # -f flag forces overwrite if the AVD already exists
           echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager create avd -n test_emulator -k "system-images;android-33;default;x86_64" --device "pixel" -f
 
-          # List AVDs to confirm that 'test_emulator' was created successfully
           ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager list avd
 
       - name: Start Emulator
+        env:
+          # Ensure the emulator looks for AVDs in the explicitly defined path
+          ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
         run: |
-          # Start the emulator in the background
           ${ANDROID_HOME}/emulator/emulator -avd test_emulator -no-window -no-audio -gpu off &
-          # Wait for the emulator to fully boot up
           ${ANDROID_HOME}/platform-tools/adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'
-          # List connected devices to confirm the emulator is running and detected by adb
           ${ANDROID_HOME}/platform-tools/adb devices -l
-          # Unlock the emulator screen, essential for UI tests to interact
           ${ANDROID_HOME}/platform-tools/adb shell input keyevent 82
 
       - name: Run UI Tests on Emulator

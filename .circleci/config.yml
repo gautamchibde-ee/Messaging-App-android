@@ -57,6 +57,10 @@ jobs:
       - save_gradle_cache # Use the reusable command (save after dependencies are downloaded)
 
       - run:
+          name: Code Check
+          command: ./gradlew datekt ktlintCheck
+
+      - run:
           name: Run Build
           # Choose the appropriate build command for your needs:
           # ./gradlew build - Will run lint, tests, and assemble for all variants. Can be slow.
@@ -79,10 +83,8 @@ workflows:
   build_workflow:
     jobs:
       - build_android:
-          # Optional: Add filters if you only want to run this on specific branches
           filters:
             branches:
               only:
                 - main
                 - develop
-                # - /feature\/.*/ # Example: Run on all branches starting with 'feature/'

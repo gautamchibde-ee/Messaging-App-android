@@ -1,21 +1,45 @@
 version: 2.1
 
+orbs:
+  android: circleci/android@2.1.2
+
 jobs:
-  android-tests:
+  build-and-test:
     docker:
-      - image: cimg/android:2024.06.1
-    working_directory: ~/project
-
+      - image: cimg/android:2024.06
     environment:
-      GRADLE_OPTS: "-Dorg.gradle.daemon=false"
-      ANDROID_HOME: /opt/android/sdk
-
+      JVM_OPTS: -Xmx4096m
+      GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxPermSize=1024m -XX:+HeapDumpOnOutOfMemoryError" -Dkotlin.daemon.jvm.options="-Xmx4096m"
+      TERM: dumb
+      ANDROID_SDK_ROOT: /opt/android/sdk
     steps:
       - checkout
 
       - run:
-          name: Grant permission to gradlew
-          command: chmod +x ./gradlew
+          name: Restore Gradle cache
+          command: |
+            mkdir -p ~/.gradle
+            cp gradle.properties ~/.gradle/gradle.properties || true
+
+      - restore_cache:
+          keys:
+            - gradle-cache-v1-{{ checksum "build.gradle.kts" }}-{{ checksum  "app/build.gradle.kts" }}
+            - gradle-cache-v1-
+
+      - run:
+          name: Download dependencies
+          command: ./gradlew dependencies
+
+      - save_cache:
+          paths:
+            - ~/.gradle
+            - ~/.gradle/caches/
+            - ~/.gradle/wrapper/
+          key: gradle-cache-v1-{{ checksum "build.gradle.kts" }}-{{ checksum "app/build.gradle.kts" }}
+
+      - run:
+          name: Build APK
+          command: ./gradlew assembleDebug
 
       - run:
           name: Run Unit Tests
@@ -26,40 +50,42 @@ jobs:
           command: yes | sdkmanager --licenses
 
       - run:
-          name: Install Emulator and System Image
+          name: Create Emulator
           command: |
-            sdkmanager "platform-tools" "platforms;android-30" "system-images;android-30;google_apis;x86_64" "emulator"
-
-      - run:
-          name: Create AVD
-          command: echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --force
+            sdkmanager "system-images;android-30;google_apis;x86_64"
+            echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --device "pixel"
 
       - run:
           name: Start Emulator
+          background: true
           command: |
-            emulator -avd test -no-audio -no-window -no-boot-anim -gpu swiftshader_indirect &
-            adb wait-for-device
-            adb shell settings put global window_animation_scale 0 &
-            adb shell settings put global transition_animation_scale 0 &
-            adb shell settings put global animator_duration_scale 0
+            emulator -avd test -no-snapshot -noaudio -no-window -gpu off &
+
+      - run:
+          name: Wait for Emulator to Boot
+          command: |
+            set +e
+            bootanim=""
+            failcounter=0
+            timeout_in_sec=600
+            while [[ "$bootanim" != "stopped" && $failcounter -lt $timeout_in_sec ]]; do
+              bootanim=`adb -e shell getprop init.svc.bootanim 2>&1 | tr -d '\r'`
+              echo "Waiting for emulator to start: $bootanim"
+              sleep 5
+              let "failcounter += 5"
+            done
+            if [[ "$bootanim" != "stopped" ]]; then
+              echo "Emulator failed to start"
+              exit 1
+            fi
+            adb shell input keyevent 82
 
       - run:
           name: Run UI Tests
           command: ./gradlew connectedDebugAndroidTest
 
-      - store_artifacts:
-          path: app/build/reports/tests/testDebugUnitTest
-          destination: unit-test-results
-
-      - store_artifacts:
-          path: app/build/outputs/androidTest-results/connected
-          destination: ui-test-results
-
-      - store_artifacts:
-          path: app/build/outputs/connected_android_test_additional_output/debugAndroidTest/connected
-          destination: screenshots
-
 workflows:
-  android_ci:
+  version: 2
+  test:
     jobs:
-      - android-tests
+      - build-and-test

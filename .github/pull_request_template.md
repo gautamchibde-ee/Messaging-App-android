@@ -110,5 +110,3 @@ Include screenshots or screen recordings if helpful for visual context.
 - [ ] UI tests added for Compose screen
 
 ---
-
-Thank you again! 🙌

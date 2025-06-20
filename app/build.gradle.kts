@@ -3,9 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
-    kotlin("kapt")
     alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt)
+    kotlin("kapt")
 }
 
 android {
@@ -51,10 +51,6 @@ android {
         resolutionStrategy {
             force("androidx.test.espresso:espresso-core:${libs.versions.espressoCore.get()}")
         }
-    }
-
-    testOptions {
-        execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
 
     detekt {
@@ -107,5 +103,5 @@ dependencies {
 
     // Hilt Testing for Android Instrumentation Tests
     androidTestImplementation(libs.hilt.android.testing)
-    androidTestUtil("androidx.test:orchestrator:1.4.2")
 }
+

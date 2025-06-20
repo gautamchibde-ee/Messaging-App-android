@@ -58,7 +58,7 @@ jobs:
 
       - run:
           name: Code Check
-          command: ./gradlew datekt ktlintCheck
+          command: ./gradlew detekt ktlintCheck
 
       - run:
           name: Run Build

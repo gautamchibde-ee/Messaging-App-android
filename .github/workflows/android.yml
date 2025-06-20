@@ -30,23 +30,24 @@ jobs:
 
       - name: Set up Android SDK and Create AVD
         env:
-          # Define a specific path for AVDs within the GitHub Actions workspace
           ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
         run: |
           mkdir -p ${ANDROID_AVD_HOME}
 
-          echo "y" | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "system-images;android-33;default;x86_64" "platforms;android-33" "build-tools;33.0.0" "platform-tools"
+          # Install arm64-v8a system image instead of x86_64
+          echo "y" | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "system-images;android-33;default;arm64-v8a" "platforms;android-33" "build-tools;33.0.0" "platform-tools"
           echo "y" | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
 
-          echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager create avd -n test_emulator -k "system-images;android-33;default;x86_64" --device "pixel" -f
+          # Create AVD with arm64-v8a system image
+          echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager create avd -n test_emulator -k "system-images;android-33;default;arm64-v8a" --device "pixel" -f
 
           ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager list avd
 
       - name: Start Emulator
         env:
-          # Ensure the emulator looks for AVDs in the explicitly defined path
           ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
         run: |
+          # The -gpu off flag is still useful for general stability in CI
           ${ANDROID_HOME}/emulator/emulator -avd test_emulator -no-window -no-audio -gpu off &
           ${ANDROID_HOME}/platform-tools/adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'
           ${ANDROID_HOME}/platform-tools/adb devices -l

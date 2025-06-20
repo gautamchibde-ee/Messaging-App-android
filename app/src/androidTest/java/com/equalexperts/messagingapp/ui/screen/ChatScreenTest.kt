@@ -28,4 +28,6 @@ class ChatScreenTest {
             .onNodeWithText("Fill the code for chat app")
             .assertExists()
     }
+
+    // TODO write UI test cases for chat screen
 }

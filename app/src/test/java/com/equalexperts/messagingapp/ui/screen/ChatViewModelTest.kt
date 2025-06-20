@@ -1,3 +1,5 @@
 package com.equalexperts.messagingapp.ui.screen
 
-class ChatViewModelTest
+class ChatViewModelTest {
+    // TODO write unit tests for ChatViewModel
+}

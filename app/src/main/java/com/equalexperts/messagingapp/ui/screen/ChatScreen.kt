@@ -6,5 +6,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun ChatScreen(viewModel: ChatViewModel = hiltViewModel()) {
+    // TODO
     Text("Fill the code for chat app")
 }

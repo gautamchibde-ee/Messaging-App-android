@@ -1,91 +1,38 @@
 version: 2.1
 
 orbs:
-  android: circleci/android@2.1.2
-
-jobs:
-  build-and-test:
-    docker:
-      - image: cimg/android:2024.06
-    environment:
-      JVM_OPTS: -Xmx4096m
-      GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxPermSize=1024m -XX:+HeapDumpOnOutOfMemoryError" -Dkotlin.daemon.jvm.options="-Xmx4096m"
-      TERM: dumb
-      ANDROID_SDK_ROOT: /opt/android/sdk
-    steps:
-      - checkout
-
-      - run:
-          name: Restore Gradle cache
-          command: |
-            mkdir -p ~/.gradle
-            cp gradle.properties ~/.gradle/gradle.properties || true
-
-      - restore_cache:
-          keys:
-            - gradle-cache-v1-{{ checksum "build.gradle.kts" }}-{{ checksum  "app/build.gradle.kts" }}
-            - gradle-cache-v1-
-
-      - run:
-          name: Download dependencies
-          command: ./gradlew dependencies
-
-      - save_cache:
-          paths:
-            - ~/.gradle
-            - ~/.gradle/caches/
-            - ~/.gradle/wrapper/
-          key: gradle-cache-v1-{{ checksum "build.gradle.kts" }}-{{ checksum "app/build.gradle.kts" }}
-
-      - run:
-          name: Build APK
-          command: ./gradlew assembleDebug
-
-      - run:
-          name: Run Unit Tests
-          command: ./gradlew testDebugUnitTest
-
-      - run:
-          name: Accept Licenses
-          command: yes | sdkmanager --licenses
-
-      - run:
-          name: Create Emulator
-          command: |
-            sdkmanager "system-images;android-30;google_apis;x86_64"
-            echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --device "pixel"
-
-      - run:
-          name: Start Emulator
-          background: true
-          command: |
-            emulator -avd test -no-snapshot -noaudio -no-window -gpu off &
-
-      - run:
-          name: Wait for Emulator to Boot
-          command: |
-            set +e
-            bootanim=""
-            failcounter=0
-            timeout_in_sec=600
-            while [[ "$bootanim" != "stopped" && $failcounter -lt $timeout_in_sec ]]; do
-              bootanim=`adb -e shell getprop init.svc.bootanim 2>&1 | tr -d '\r'`
-              echo "Waiting for emulator to start: $bootanim"
-              sleep 5
-              let "failcounter += 5"
-            done
-            if [[ "$bootanim" != "stopped" ]]; then
-              echo "Emulator failed to start"
-              exit 1
-            fi
-            adb shell input keyevent 82
-
-      - run:
-          name: Run UI Tests
-          command: ./gradlew connectedDebugAndroidTest
+  android: "2.1.2"
 
 workflows:
-  version: 2
-  test:
+  test-and-build:
     jobs:
+      - unit-test
+      - android-test: # Commits to any branch - skip matrix of devices
+          filters:
+            branches:
+              ignore: main
+      - android-test: # Commits to main branch only - run full matrix
+          matrix:
+            alias: android-test-all
+            parameters:
+              system-image:
+                - system-images;android-30;google_apis;x86
+                - system-images;android-29;google_apis;x86
+                - system-images;android-28;google_apis;x86
+                - system-images;android-27;google_apis;x86
+                - system-images;android-26;google_apis;x86
+                - system-images;android-25;google_apis;x86
+                - system-images;android-24;google_apis;x86
+                - system-images;android-23;google_apis;x86
+          name: android-test-<<matrix.system-image>>
+          filters:
+            branches:
+              only: main
+      - release-build:
+          requires:
+            - unit-test
+            - android-test-all
+          filters:
+            branches:
+              only: main # Commits to main branch
       - build-and-test

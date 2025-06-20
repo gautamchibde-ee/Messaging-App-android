@@ -1,34 +1,23 @@
 version: 2.1
 
-# Define reusable executors (environments)
 executors:
   android_executor:
     docker:
-      # Choose an image with Android SDK, Java, and other tools you need
-      # CircleCI provides convenience images: cimg/android:<version>-node adds Node.js if needed
-      # Check CircleCI docs for the latest recommended images and tags:
-      # https://circleci.com/docs/circleci-images-android
-      # Example: Using an image with Android API 34 and Java 17
-      - image: cimg/android:2024.07 # Or a specific version like cimg/android:2024.07.1
+      - image: cimg/android:2024.07
     environment:
-      # Set the JVM options for Gradle to avoid out-of-memory errors
-      _JAVA_OPTIONS: "-Xms1g -Xmx2g" # Adjust memory as needed
-      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2" # Optimize Gradle for CI
+      _JAVA_OPTIONS: "-Xms1g -Xmx2g"
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2"
     working_directory: ~/project
 
-# Define reusable commands (optional, but good for DRY configurations)
 commands:
-  # Command to restore Gradle cache
   restore_gradle_cache:
     steps:
       - restore_cache:
           keys:
             - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
             - gradle-cache-{{ checksum "build.gradle.kts" }}-{{ checksum "app/build.gradle.kts" }} # Add other build.gradle files if you have more modules
-            # Fallback to the latest cache if no exact match is found
             - gradle-cache-
 
-  # Command to save Gradle cache
   save_gradle_cache:
     steps:
       - save_cache:
@@ -37,24 +26,55 @@ commands:
             - ~/.gradle/wrapper
           key: gradle-cache-{{ checksum "build.gradle.kts" }}-{{ checksum "app/build.gradle.kts" }} # Match the restore key
 
-# Define Jobs
+  run_ui_tests:
+    steps:
+      - run:
+          name: Create and run emulator
+          command: |
+            set -x
+            # List available system images
+            sdkmanager --list | grep system-images
+            # Create an AVD
+            echo "no" | avdmanager create avd -n test_avd -k "system-images;android-30;google_apis;x86_64" --force
+            # Start emulator in background
+            $ANDROID_HOME/emulator/emulator -avd test_avd -no-audio -no-window -gpu swiftshader_indirect -no-snapshot -wipe-data &
+            # Wait for emulator to boot
+            adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done;'
+            # Unlock screen
+            adb shell input keyevent 82
+            # Disable animations
+            adb shell settings put global window_animation_scale 0.0
+            adb shell settings put global transition_animation_scale 0.0
+            adb shell settings put global animator_duration_scale 0.0
+            # Verify emulator is running
+            adb devices
+            echo "Emulator started"
+      - run:
+          name: Run UI Tests
+          command: ./gradlew connectedCheck
+      - store_artifacts:
+          path: app/build/reports/androidTests/connected/
+          destination: ui-test-reports/
+      - store_test_results:
+          path: app/build/outputs/androidTest-results/connected/
+
 jobs:
   build_android:
     executor: android_executor
     steps:
-      - checkout # Checks out the source code to the working directory
+      - checkout
 
       - run:
           name: Set Execute Permissions for gradlew
           command: chmod +x ./gradlew
 
-      - restore_gradle_cache # Use the reusable command
+      - restore_gradle_cache
 
       - run:
           name: Download Dependencies
           command: ./gradlew androidDependencies
 
-      - save_gradle_cache # Use the reusable command (save after dependencies are downloaded)
+      - save_gradle_cache
 
       - run:
           name: Code Check
@@ -62,21 +82,36 @@ jobs:
 
       - run:
           name: Run Build
-          # Choose the appropriate build command for your needs:
-          # ./gradlew build - Will run lint, tests, and assemble for all variants. Can be slow.
-          # ./gradlew assembleDebug - Builds only the debug APK. Faster.
-          # ./gradlew assembleRelease - Builds only the release APK (requires signing config).
-          command: ./gradlew assembleDebug # Example: Building the debug APK
+          command: ./gradlew assembleDebug
 
-      # Optional: Store the generated APK as an artifact
       - store_artifacts:
-          path: app/build/outputs/apk/debug/ # Path to your debug APK
-          destination: apks/ # Destination directory in the artifacts tab
+          path: app/build/outputs/apk/debug/
+          destination: apks/
 
-      # Optional: Store other build outputs like mapping files for release builds
-      # - store_artifacts:
-      #     path: app/build/outputs/mapping/release/mapping.txt
-      #     destination: mapping-files/
+  ui_tests_on_emulator:
+    executor: android_executor
+    steps:
+      - checkout
+
+      - run:
+          name: Set Execute Permissions for gradlew
+          command: chmod +x ./gradlew
+
+      - restore_gradle_cache
+
+      - run:
+          name: Download Dependencies
+          command: ./gradlew androidDependencies
+
+      # Building the app and test APK is necessary before running UI tests
+      - run:
+          name: Build App and Test APK
+          command: ./gradlew assembleDebug assembleDebugAndroidTest
+
+      - run_ui_tests
+
+      # No need to save cache here as it's primarily for build dependencies
+      # and UI tests might not significantly change the cache in a way that benefits subsequent builds.
 
 workflows:
   version: 2
@@ -88,3 +123,10 @@ workflows:
               only:
                 - main
                 - develop
+      - ui_tests_on_emulator:
+          requires:
+            - build_android # Ensure build completes before running UI tests
+          filters:
+            branches:
+              only:
+                - main # Or specify branches where UI tests should run
